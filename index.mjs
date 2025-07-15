@@ -4,15 +4,33 @@ import * as osc from 'osc';
 const inputPortNumber = 9240;
 const outputPortNumber = 9239;
 
+class OpState {
+	constructor(opPath, opName, parPageDefs) {
+		this.opPath = opPath;
+		this.opName = opName;
+		this.parPageDefs = parPageDefs;
+		this.parVals = {}
+		this.selectedParGroup = null;
+	}
+
+	toString() {
+		return `${this.opPath}:${this.opName}`;
+	}
+}
+
 class Connector {
 	constructor(device, oscOut, oscIn) {
 		this.device = device;
 		this.oscOut = oscOut;
 		this.oscIn = oscIn;
 
-		this.curOpPath = null;
+		this.curParOwner = null;
 		this.curParName = null;
 		this.curParInfo = null;
+
+		this.targetOpPath = null;
+		this.targetOpName = null;
+		this.targetOpDef = null;
 	}
 
 	open() {
@@ -29,11 +47,19 @@ class Connector {
 		this.oscOut.open();
 	}
 
-	setCurrentTarget(opPath, parName, parInfo) {
-		this.curOpPath = opPath;
+	setCurrentTargetPar(opPath, parName, parInfo) {
+		this.curParOwner = opPath;
 		this.curParName = parName;
 		this.curParInfo = parInfo;
 		console.log(`Current target set to ${opPath}:${parName}`);
+		this.updateDisplay();
+	}
+
+	setTargetOp(opPath, opName, opDef) {
+		this.targetOpPath = opPath;
+		this.targetOpName = opName;
+		this.targetOpDef = opDef;
+		console.log(`Target operation set to ${opPath}`);
 		this.updateDisplay();
 	}
 
@@ -59,19 +85,33 @@ class Connector {
 
 	onOscMessage(message, timeTag, info) {
 		switch (message.address) {
-			case '/loupedeck/target/setPar':
+			case '/loupedeck/targetPar/set':
 				if (message.args.length === 3) {
 					const opPath = message.args[0].value;
 					const parName = message.args[1].value;
 					const parInfoStr = message.args[2].value;
 					const parInfo = JSON.parse(parInfoStr);
-					this.setCurrentTarget(opPath, parName, parInfo);
+					this.setCurrentTargetPar(opPath, parName, parInfo);
 				} else {
-					console.error('Invalid arguments for /loupedeck/setCurrentTarget');
+					console.error('Invalid arguments for /loupedeck/targetPar/set');
 				}
 				break;
-			case '/loupedeck/target/clear':
-				this.setCurrentTarget(null, null, null);
+			case '/loupedeck/targetPar/clear':
+				this.setCurrentTargetPar(null, null, null);
+				break;
+				case '/loupedeck/targetOp/set':
+				if (message.args.length === 3) {
+					const opPath = message.args[0].value;
+					const opName = message.args[1].value;
+					const opDefStr = message.args[2].value;
+					const opDef = JSON.parse(opDefStr);
+					this.setTargetOp(opPath, opName, opDef);
+				} else {
+					console.error('Invalid arguments for /loupedeck/targetOp/set');
+				}
+				break;
+			case '/loupedeck/targetOp/clear':
+				this.setTargetOp(null, null, null);
 				break;
 			default:
 				console.warn('Unrecognized OSC message received:', message);
@@ -82,10 +122,10 @@ class Connector {
 		this.device.drawScreen('center', (c, w, h) => {
 			c.fillStyle = '#990033';
 			c.fillRect(0, 0, w, h);
-			if (this.curOpPath) {
+			if (this.curParOwner) {
 				c.font = '20px Arial';
 				c.fillStyle = 'white';
-				c.fillText(this.curOpPath, 10, 30);
+				c.fillText(this.curParOwner, 10, 30);
 			}
 			if (this.curParInfo) {
 				c.font = '16px Arial';
