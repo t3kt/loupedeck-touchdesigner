@@ -1,13 +1,13 @@
 import json
-import TDJSON
 
 class LoupedeckConnector:
 	def __init__(self, ownerComp):
 		self.ownerComp = ownerComp
-		self.oscOut = ownerComp.op('oscout')
+		# self.oscOut = ownerComp.op('oscout')
+		self.server = ownerComp.op('webserver')
 	
-	def onReceiveOsc(self, address, args):
-		print('Receive OSC', address, repr(args))
+	def onSocketText(self, text):
+		print('Receive Socket Text', text)
 	
 	def GetTargetOp(self):
 		tgt = _targetFromPane(ui.panes.current)
@@ -22,19 +22,22 @@ class LoupedeckConnector:
 	def onTargetChange(self):
 		target = self.GetTargetOp()
 		if target is None:
-			self._sendMessage('/loupedeck/targetOp/clear', [''])
+			self._sendMessage({'address':'/loupedeck/targetOp/clear'})
 		else:
-			self._sendMessage('/loupedeck/targetOp/set', [target.path, target.name, _opDef(target)])
+			self._sendMessage({'address': '/loupedeck/targetOp/set','args': [target.path, target.name, _opDef(target)]})
 	
 	def onCurParChange(self, par):
 		if par is None or par.isOP or par.isString or par.isSequence:
-			self._sendMessage('/loupedeck/targetPar/clear', [''])
+			self._sendMessage({'address':'/loupedeck/targetPar/clear'})
 		else:
-			self._sendMessage('/loupedeck/targetPar/set', [par.owner.path, par.name, json.dumps(_parInfo(par))])
+			self._sendMessage({'address':'/loupedeck/targetPar/set', 'args': [par.owner.path, par.name, _parInfo(par)]})
 
-	def _sendMessage(self, addr, args):
-		print('Send OSC ', addr, args)
-		self.oscOut.sendOSC(addr, args)
+	def _sendMessage(self, data):
+		print('Send message ', data)
+		text = json.dumps(data)
+		# self.oscOut.sendOSC(addr, args)
+		for client in self.server.webSocketConnections:
+			self.server.webSocketSendText(client, text)
 
 def _targetFromPane(pane: Pane):
 	if not pane or pane.type != PaneType.NETWORKEDITOR or pane.owner is None:
@@ -76,6 +79,8 @@ def _pageDef(page: Page):
 		'parGroups': [_parGroupDef(pg) for pg in page.parGroups],
 	}
 def _parGroupDef(parGroup: ParGroup):
+	if parGroup.isOP:
+		return None
 	return {
 		'name': parGroup.name,
 		'label': parGroup.label,

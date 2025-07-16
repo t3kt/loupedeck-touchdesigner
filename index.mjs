@@ -1,8 +1,7 @@
 import {discover} from 'loupedeck';
-import * as osc from 'osc';
+import WebSocket from 'ws';
 
-const inputPortNumber = 9240;
-const outputPortNumber = 9239;
+const socketPortNumber = 9238;
 
 class OpState {
 	constructor(opPath, opName, opDef) {
@@ -35,10 +34,9 @@ class OpState {
 }
 
 class Connector {
-	constructor(device, oscOut, oscIn) {
+	constructor(device, socket) {
 		this.device = device;
-		this.oscOut = oscOut;
-		this.oscIn = oscIn;
+		this.socket = socket;
 
 		this.curParOwner = null;
 		this.curParName = null;
@@ -51,17 +49,12 @@ class Connector {
 	}
 
 	open() {
-		this.oscIn.on('error', this.onOscInError.bind(this));
-		this.oscIn.on('message', this.onOscMessage.bind(this));
-
-		this.oscOut.on('error', this.onOscOutError.bind(this));
+		this.socket.addEventListener('error', this.onSocketError.bind(this));
+		this.socket.addEventListener('message', this.onSocketMessage.bind(this));
 
 		this.device.on('connect', this.onDeviceConnect.bind(this));
 		this.device.on('down', this.onButtonDown.bind(this));
 		this.device.on('rotate', this.onEncoderRotate.bind(this));
-
-		this.oscIn.open();
-		this.oscOut.open();
 	}
 
 	setCurrentTargetPar(opPath, parName, parInfo) {
@@ -93,22 +86,19 @@ class Connector {
 		console.log('Encoder rotate:', encoder);
 	}
 
-	onOscInError(error) {
-		console.error('OSC in error:', error);
+	onSocketError(error) {
+		console.error('Socket error:', error);
 	}
 
-	onOscOutError(error) {
-		console.error('OSC out error:', error);
-	}
-
-	onOscMessage(message, timeTag, info) {
+	onSocketMessage(messageText) {
+		// console.log('Received Socket message:', messageText);
+		let message = JSON.parse(messageText);
 		switch (message.address) {
 			case '/loupedeck/targetPar/set':
 				if (message.args.length === 3) {
-					const opPath = message.args[0].value;
-					const parName = message.args[1].value;
-					const parInfoStr = message.args[2].value;
-					const parInfo = JSON.parse(parInfoStr);
+					const opPath = message.args[0];
+					const parName = message.args[1];
+					const parInfo = message.args[2];
 					this.setCurrentTargetPar(opPath, parName, parInfo);
 				} else {
 					console.error('Invalid arguments for /loupedeck/targetPar/set');
@@ -119,10 +109,9 @@ class Connector {
 				break;
 				case '/loupedeck/targetOp/set':
 				if (message.args.length === 3) {
-					const opPath = message.args[0].value;
-					const opName = message.args[1].value;
-					const opDefStr = message.args[2].value;
-					const opDef = JSON.parse(opDefStr);
+					const opPath = message.args[0];
+					const opName = message.args[1];
+					const opDef = message.args[2];
 					this.setTargetOp(opPath, opName, opDef);
 				} else {
 					console.error('Invalid arguments for /loupedeck/targetOp/set');
@@ -181,17 +170,9 @@ async function main() {
 		}
 	}
 
-	const oscOut = new osc.default.UDPPort({
-		remoteAddress: 'localhost',
-		remotePort: outputPortNumber,
-	});
-	const oscIn = new osc.default.UDPPort({
-		localAddress: '0.0.0.0',
-		localPort: inputPortNumber,
-		metadata: true,
-	});
+	const socket = new WebSocket(`ws://localhost:${socketPortNumber}`);
 
-	const connector = new Connector(device, oscOut, oscIn);
+	const connector = new Connector(device, socket);
 	connector.open();
 	// device.on('rotate', (encoder) => {
 	// 	console.log('Encoder rotate:', encoder);
