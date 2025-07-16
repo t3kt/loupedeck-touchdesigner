@@ -5,12 +5,28 @@ const inputPortNumber = 9240;
 const outputPortNumber = 9239;
 
 class OpState {
-	constructor(opPath, opName, parPageDefs) {
+	constructor(opPath, opName, opDef) {
 		this.opPath = opPath;
 		this.opName = opName;
-		this.parPageDefs = parPageDefs;
+		this.parPageDefs = opDef.pages;
+		this.currentParPageIndex = opDef.pageIndex || 0;
 		this.parVals = {}
 		this.selectedParGroup = null;
+	}
+
+	draw(device) {
+		device.drawScreen('center', (c, w, h) => {
+			c.fillStyle = '#990033';
+			c.fillRect(0, 0, w, h);
+			c.font = '20px Arial';
+			c.fillStyle = 'white';
+			c.fillText(this.opPath, 10, 30);
+			c.fillText(this.opName, 10, 60);
+			const pageDef = this.parPageDefs[this.currentParPageIndex];
+			if (pageDef) {
+				c.fillText(`Page: ${pageDef.name}`, 10, 90);
+			}
+		});
 	}
 
 	toString() {
@@ -31,6 +47,7 @@ class Connector {
 		this.targetOpPath = null;
 		this.targetOpName = null;
 		this.targetOpDef = null;
+		this.targetOpState = null;
 	}
 
 	open() {
@@ -59,6 +76,7 @@ class Connector {
 		this.targetOpPath = opPath;
 		this.targetOpName = opName;
 		this.targetOpDef = opDef;
+		this.targetOpState = !opDef ? null : new OpState(opPath, opName, opDef);
 		console.log(`Target operation set to ${opPath}`);
 		this.updateDisplay();
 	}
@@ -119,24 +137,35 @@ class Connector {
 	}
 
 	updateDisplay() {
-		this.device.drawScreen('center', (c, w, h) => {
-			c.fillStyle = '#990033';
-			c.fillRect(0, 0, w, h);
-			if (this.curParOwner) {
+		// this.device.drawScreen('center', (c, w, h) => {
+		// 	c.fillStyle = '#990033';
+		// 	c.fillRect(0, 0, w, h);
+		// 	if (this.curParOwner) {
+		// 		c.font = '20px Arial';
+		// 		c.fillStyle = 'white';
+		// 		c.fillText(this.curParOwner, 10, 30);
+		// 	}
+		// 	if (this.curParInfo) {
+		// 		c.font = '16px Arial';
+		// 		c.fillStyle = 'white';
+		// 		let text = this.curParInfo.label;
+		// 		if (this.curParInfo.subLabel) {
+		// 			text += ` (${this.curParInfo.subLabel})`;
+		// 		}
+		// 		c.fillText(text, 10, 60);
+		// 	}
+		// });
+		if (this.targetOpState) {
+			this.targetOpState.draw(this.device);
+		} else {
+			this.device.drawScreen('center', (c, w, h) => {
+				c.fillStyle = '#990033';
+				c.fillRect(0, 0, w, h);
 				c.font = '20px Arial';
 				c.fillStyle = 'white';
-				c.fillText(this.curParOwner, 10, 30);
-			}
-			if (this.curParInfo) {
-				c.font = '16px Arial';
-				c.fillStyle = 'white';
-				let text = this.curParInfo.label;
-				if (this.curParInfo.subLabel) {
-					text += ` (${this.curParInfo.subLabel})`;
-				}
-				c.fillText(text, 10, 60);
-			}
-		});
+				c.fillText('No target operator set', 10, 30);
+			});
+		}
 	}
 }
 

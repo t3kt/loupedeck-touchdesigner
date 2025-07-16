@@ -22,15 +22,19 @@ class LoupedeckConnector:
 	def onTargetChange(self):
 		target = self.GetTargetOp()
 		if target is None:
-			self.oscOut.sendOSC('/loupedeck/targetOp/clear', [''])
+			self._sendMessage('/loupedeck/targetOp/clear', [''])
 		else:
-			self.oscOut.sendOSC('/loupedeck/targetOp/set', [target.path, target.name, _opDef(target)])
+			self._sendMessage('/loupedeck/targetOp/set', [target.path, target.name, _opDef(target)])
 	
 	def onCurParChange(self, par):
 		if par is None or par.isOP or par.isString or par.isSequence:
-			self.oscOut.sendOSC('/loupedeck/targetPar/clear', [''])
+			self._sendMessage('/loupedeck/targetPar/clear', [''])
 		else:
-			self.oscOut.sendOSC('/loupedeck/targetPar/set', [par.owner.path, par.name, json.dumps(_parInfo(par))])
+			self._sendMessage('/loupedeck/targetPar/set', [par.owner.path, par.name, json.dumps(_parInfo(par))])
+
+	def _sendMessage(self, addr, args):
+		print('Send OSC ', addr, args)
+		self.oscOut.sendOSC(addr, args)
 
 def _targetFromPane(pane: Pane):
 	if not pane or pane.type != PaneType.NETWORKEDITOR or pane.owner is None:
@@ -63,6 +67,7 @@ def _opDef(op):
 		'name': op.name,
 		'path': op.path,
 		'type': op.type,
+		'pageIndex': op.par.pageindex.eval(),
 		'pages': [_pageDef(page) for page in op.pages],
 	}
 def _pageDef(page: Page):
@@ -79,14 +84,14 @@ def _parGroupDef(parGroup: ParGroup):
 		'mode': [m.name for m in parGroup.mode],
 		'enable': parGroup.enable,
 		'readOnly': parGroup.readOnly,
-		'min': par.min,
-		'max': par.max,
-		'clampMin': par.clampMin,
-		'clampMax': par.clampMax,
-		'default': par.default,
-		'normMin': par.normMin,
-		'normMax': par.normMax,
-		'menuNames': par.menuNames,
-		'menuLabels': par.menuLabels,
-		'parDefs': [_parDef(p) for p in parGroup.pars],
+		'min': parGroup.min,
+		'max': parGroup.max,
+		'clampMin': parGroup.clampMin,
+		'clampMax': parGroup.clampMax,
+		'default': parGroup.default,
+		'normMin': parGroup.normMin,
+		'normMax': parGroup.normMax,
+		'menuNames': parGroup.menuNames,
+		'menuLabels': parGroup.menuLabels,
+		'value': parGroup.eval(),
 	}
